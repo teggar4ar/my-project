@@ -1,17 +1,33 @@
 pipeline {
-    agent any
+    agent {
+        docker { 
+            image 'node:18-alpine'
+            // Mount Docker socket agar kita bisa menjalankan perintah docker dari dalam container
+            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub-cred')
         DOCKER_IMAGE = 'muhammadazfa/blog-app'
         DOCKER_TAG = "${env.BUILD_NUMBER}"
-        MINIKUBE_CREDS = credentials('minikube-cred')
+        // MINIKUBE_CREDS tidak perlu di environment global karena digunakan via withCredentials
     }
     
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
+            }
+        }
+        
+        // TAMBAHKAN STAGE INI untuk menginstall tools yang hilang
+        stage('Setup Environment') {
+            steps {
+                sh 'apk add --no-cache docker-cli kubectl'
+                // Verifikasi instalasi (opsional)
+                sh 'docker --version'
+                sh 'kubectl version --client'
             }
         }
         
@@ -25,6 +41,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
+                // Sekarang perintah 'docker' akan ditemukan
                 sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
             }
         }
@@ -46,21 +63,21 @@ pipeline {
         
         stage('Deploy to Minikube') {
             steps {
-                withCredentials([file(credentialsId: 'minikube-cred', variable: 'KUBECONFIG')]) {
-                    sh 'export KUBECONFIG=$KUBECONFIG'
-                    sh 'kubectl apply -f k8s/deployment.yaml'
-                    sh 'kubectl apply -f k8s/service.yaml'
-                    sh 'kubectl rollout status deployment/blog-app'
+                withCredentials([file(credentialsId: 'minikube-cred', variable: 'KUBECONFIG_FILE')]) {
+                    // Ini sudah benar
+                    sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl apply -f k8s/deployment.yaml'
+                    sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl apply -f k8s/service.yaml'
+                    sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl rollout status deployment/blog-app'
                 }
             }
         }
         
         stage('Verify Deployment') {
             steps {
-                withCredentials([file(credentialsId: 'minikube-cred', variable: 'KUBECONFIG')]) {
-                    sh 'export KUBECONFIG=$KUBECONFIG'
-                    sh 'kubectl get pods | grep blog-app'
-                    sh 'kubectl get services | grep blog-app'
+                withCredentials([file(credentialsId: 'minikube-cred', variable: 'KUBECONFIG_FILE')]) {
+                    // PERBAIKAN: Gunakan 'env' untuk setiap perintah, sama seperti stage sebelumnya
+                    sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl get pods | grep blog-app'
+                    sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl get services | grep blog-app'
                 }
             }
         }
