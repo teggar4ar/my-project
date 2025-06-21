@@ -16,4 +16,4 @@ spec:
         - name: blog-app
           image: muhammadazfa/blog-app:latest
           ports:
-            - containerPort: 80
+            - containerPort: 3000
