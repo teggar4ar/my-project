@@ -3,7 +3,7 @@ pipeline {
         docker { 
             image 'node:18-alpine'
             // Mount Docker socket agar kita bisa menjalankan perintah docker dari dalam container
-            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+            args '-u root -v /var/run/docker.sock:/var/run/docker.sock --network minikube'
         }
     }
     
