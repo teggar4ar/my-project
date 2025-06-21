@@ -1,0 +1,17 @@
+global:
+  # Ganti dengan URL Webhook Discord Anda!
+  # Anda bisa menambahkannya sebagai variabel di inventory atau group_vars.
+  # Contoh: discord_webhook_url: "https://discord.com/api/webhooks/12345/abcdef"
+  # Untuk menggunakan webhook discord, biasanya perlu adapter seperti https://github.com/snitch-rulez/discord-alertmanager
+  # Atau gunakan webhook umum jika Anda punya relay. Untuk kesederhanaan, kita arahkan langsung.
+  webhook_url: "{{ discord_webhook_url }}"
+
+route:
+  receiver: 'discord-notifications'
+  group_by: ['alertname', 'instance']
+
+receivers:
+  - name: 'discord-notifications'
+    webhook_configs:
+      - url: "{{ discord_webhook_url }}"
+        send_resolved: true

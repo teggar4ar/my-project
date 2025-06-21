@@ -1,0 +1,179 @@
+---
+- name: Create a dedicated user for monitoring services
+  ansible.builtin.user:
+    name: prometheus
+    shell: /bin/false
+    create_home: false
+    system: true
+  become: true
+
+# --- Install Node Exporter ---
+- name: Download and unarchive Node Exporter
+  ansible.builtin.unarchive:
+    src: https://github.com/prometheus/node_exporter/releases/download/v1.8.1/node_exporter-1.8.1.linux-amd64.tar.gz
+    dest: /tmp/
+    remote_src: true
+
+- name: Copy Node Exporter binary to /usr/local/bin
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-1.8.1.linux-amd64/node_exporter"
+    dest: "/usr/local/bin/node_exporter"
+    mode: '0755'
+    remote_src: true
+  become: true
+
+- name: Create systemd service for Node Exporter
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: '0644'
+  notify: restart node exporter
+  become: true
+
+- name: Enable and start Node Exporter service
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+# --- Install Prometheus ---
+- name: Create directories for Prometheus
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Download and unarchive Prometheus
+  ansible.builtin.unarchive:
+    src: https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-amd64.tar.gz
+    dest: /tmp/
+    remote_src: true
+
+- name: Copy Prometheus binaries
+  become: true
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-2.53.0.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+    remote_src: true
+  loop:
+    - prometheus
+    - promtool
+
+- name: Copy Prometheus configuration files
+  become: true
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/prometheus/{{ item.dest }}"
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+  loop:
+    - { src: 'prometheus.yml.j2', dest: 'prometheus.yml' }
+    - { src: 'alert.rules.yml.j2', dest: 'alert.rules.yml' }
+  notify: restart prometheus
+
+- name: Create systemd service for Prometheus
+  become: true
+  ansible.builtin.template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    mode: '0644'
+  notify: restart prometheus
+
+- name: Enable and start Prometheus service
+  become: true
+  ansible.builtin.systemd:
+    name: prometheus
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# --- Install Alertmanager ---
+- name: Create directory for Alertmanager
+  become: true
+  ansible.builtin.file:
+    path: /etc/alertmanager
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+
+- name: Download and unarchive Alertmanager
+  ansible.builtin.unarchive:
+    src: https://github.com/prometheus/alertmanager/releases/download/v0.27.0/alertmanager-0.27.0.linux-amd64.tar.gz
+    dest: /tmp/
+    remote_src: true
+
+- name: Copy Alertmanager binary
+  become: true
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-0.27.0.linux-amd64/alertmanager"
+    dest: "/usr/local/bin/alertmanager"
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+    remote_src: true
+
+- name: Copy Alertmanager configuration
+  become: true
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: /etc/alertmanager/alertmanager.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+  notify: restart alertmanager
+
+- name: Create systemd service for Alertmanager
+  become: true
+  ansible.builtin.template:
+    src: alertmanager.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+    mode: '0644'
+  notify: restart alertmanager
+
+- name: Enable and start Alertmanager service
+  become: true
+  ansible.builtin.systemd:
+    name: alertmanager
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# --- Install Grafana ---
+- name: Add Grafana APT key
+  become: true
+  ansible.builtin.apt_key:
+    url: https://apt.grafana.com/gpg.key
+    state: present
+
+- name: Add Grafana repository
+  become: true
+  ansible.builtin.apt_repository:
+    repo: "deb https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+
+- name: Install Grafana
+  become: true
+  ansible.builtin.apt:
+    name: grafana
+    update_cache: true
+
+- name: Enable and start Grafana service
+  become: true
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: true
+    state: started

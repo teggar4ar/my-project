@@ -1,0 +1,44 @@
+---
+- name: Get latest stable kubectl version string
+  become: true
+  ansible.builtin.uri:
+    url: "https://storage.googleapis.com/kubernetes-release/release/stable.txt"
+    return_content: yes
+  register: k8s_stable_version
+
+- name: Download correct kubectl binary
+  become: true
+  ansible.builtin.get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/{{ k8s_stable_version.content }}/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: '0755'
+
+- name: Download minikube binary
+  become: true
+  ansible.builtin.get_url:
+    url: "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64"
+    dest: /usr/local/bin/minikube
+    mode: '0755'
+
+- name: Check if the minikube profile directory exists
+  ansible.builtin.stat:
+    path: "~/.minikube/profiles/minikube"
+  register: minikube_profile_dir
+
+- name: Start Minikube cluster if it does not exist
+  ansible.builtin.command: >
+    minikube start
+    --driver=docker
+    --profile=minikube
+    --cpus=2
+    --memory=2200mb
+  when: not minikube_profile_dir.stat.exists
+  timeout: 600
+
+- name: Enable minikube registry addon
+  ansible.builtin.command: minikube addons enable registry -p minikube
+  when: not minikube_profile_dir.stat.exists
+
+- name: Ensure Minikube cluster is always running
+  ansible.builtin.command: minikube start -p minikube
+  changed_when: false

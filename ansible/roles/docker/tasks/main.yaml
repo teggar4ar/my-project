@@ -1,0 +1,65 @@
+- name: Install dependencies
+  become: true
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+    - software-properties-common
+
+- name: Add Docker GPG key
+  become: true
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  become: true
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+    state: present
+    update_cache: yes
+
+- name: Install Docker
+  become: true
+  apt:
+    name: docker-ce
+    state: present
+    update_cache: yes
+
+- name: Add user to docker group
+  become: true
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
+- name: Reset SSH connection for group membership to take effect
+  meta: reset_connection
+
+- name: Enable and start Docker service
+  become: true
+  systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Wait for Docker to be fully ready
+  shell: docker info
+  register: docker_ready
+  until: docker_ready.rc == 0
+  retries: 10
+  delay: 5
+
+- name: Verify Docker access for user
+  shell: docker ps
+  become: false
+  become_user: "{{ ansible_user }}"
+  register: docker_access
+  retries: 5
+  delay: 3
+  until: docker_access.rc == 0

@@ -1,0 +1,9 @@
+- name: Provision infrastructure with Ansible
+  hosts: all
+  become: false
+
+  roles:
+    - role: docker
+    - role: minikube
+    - role: monitoring
+      tags: monitoring
