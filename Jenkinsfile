@@ -77,7 +77,7 @@ pipeline {
                 withCredentials([file(credentialsId: 'minikube-cred', variable: 'KUBECONFIG_FILE')]) {
                     // PERBAIKAN: Gunakan 'env' untuk setiap perintah, sama seperti stage sebelumnya
                     sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl get pods | grep blog-app'
-                    sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl get services | grep blog-app'
+                    sh 'env KUBECONFIG=$KUBECONFIG_FILE kubectl get services | grep blog-service'
                 }
             }
         }
